@@ -1,0 +1,307 @@
+@import "tailwindcss";
+
+/* --- System Design Token Variables & Custom Fallbacks --- */
+:root {
+  /* Core Brand Tokens Used Across Onboarding & App Workspace */
+  --color-brand-orange: #FF6B35;
+  --color-brand-green: #10B981;
+  
+  /* Layout Architecture Colors */
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f1f5f9;
+  --color-background-tertiary: #f8fafc;
+  
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94a3b8;
+  
+  --color-border-tertiary: #e2e8f0;
+  
+  --border-radius-md: 6px;
+  --border-radius-lg: 12px;
+}
+
+body {
+  background-color: var(--color-background-tertiary);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+
+/* ======================================================================
+   1. LOGIN PAGE: HIGH-SPREAD VECTOR TREE TRAVERSAL (GPU-ACCELERATED)
+   ====================================================================== */
+
+@keyframes globalTreePulse {
+  0%, 100% { stroke: #1e293b; stroke-width: 1.5; }
+  50% { stroke: #334155; stroke-width: 2; }
+}
+
+@keyframes nodeFlashOrange {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); border-color: #334155; background-color: #020617; }
+  10%, 25% { transform: scale(1.15); filter: drop-shadow(0 0 14px rgba(255, 107, 53, 0.6)); border-color: #FF6B35; background-color: rgba(255, 107, 53, 0.15); }
+  40% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); border-color: #334155; background-color: #020617; }
+}
+
+@keyframes nodeFlashGreen {
+  30%, 45% { transform: scale(1.15); filter: drop-shadow(0 0 14px rgba(16, 185, 129, 0.6)); border-color: #10B981; background-color: rgba(16, 185, 129, 0.15); }
+  0%, 20%, 55%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); border-color: #334155; background-color: #020617; }
+}
+
+@keyframes nodeFlashSubOrange {
+  50%, 70% { transform: scale(1.12); filter: drop-shadow(0 0 14px rgba(255, 107, 53, 0.5)); border-color: #FF6B35; background-color: rgba(255, 107, 53, 0.1); }
+  0%, 45%, 75%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); border-color: #334155; background-color: #020617; }
+}
+
+/* Fluid Signal Pulse Particle traversing down vector paths via stroke dash offsets */
+@keyframes pathSignal {
+  0% { stroke-dashoffset: 240; opacity: 0; }
+  10% { opacity: 1; }
+  70% { stroke-dashoffset: 0; opacity: 1; stroke: #10B981; }
+  85%, 100% { stroke-dashoffset: 0; opacity: 0; stroke: #FF6B35; }
+}
+
+/* Hardware Utility Classes for Login View */
+.svg-tree-net { 
+  animation: globalTreePulse 4s infinite ease-in-out; 
+  will-change: transform, stroke; 
+}
+.node-root-pulse { 
+  animation: nodeFlashOrange 4s infinite ease-in-out; 
+  transform-origin: center; 
+  will-change: transform, filter, border-color, background-color; 
+}
+.node-tier1-pulse { 
+  animation: nodeFlashGreen 4s infinite ease-in-out; 
+  transform-origin: center; 
+  will-change: transform, filter, border-color, background-color; 
+}
+.node-tier2-pulse { 
+  animation: nodeFlashSubOrange 4s infinite ease-in-out; 
+  transform-origin: center; 
+  will-change: transform, filter, border-color, background-color; 
+}
+.path-pulse-line {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 240;
+  animation: pathSignal 4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: stroke-dashoffset, opacity, stroke;
+}
+
+
+/* ======================================================================
+   2. SIGNUP PAGE: LIGHT THEME MICROSERVICES NETWORK (GPU-ACCELERATED)
+   ====================================================================== */
+
+@keyframes lightRequestFlow {
+  /* 0% to 12%: Client to Load Balancer */
+  0% { transform: translate(35px, 120px); opacity: 1; background-color: #10B981; }
+  12% { transform: translate(100px, 120px); opacity: 1; background-color: #10B981; }
+  
+  /* 12% to 24%: Load Balancer to API Gateway */
+  24% { transform: translate(175px, 120px); opacity: 1; background-color: #10B981; }
+  
+  /* 24% to 36%: API Gateway to Message Broker Message Queue */
+  36% { transform: translate(250px, 120px); opacity: 1; background-color: #10B981; }
+  
+  /* 36% to 48%: Message Broker splits out to Microservice 1 (Top Path Cache Hit) */
+  48% { transform: translate(325px, 50px); opacity: 1; background-color: #10B981; }
+  
+  /* 48% to 60%: Microservice 1 hits Memory Cache Layer */
+  60% { transform: translate(415px, 50px); opacity: 1; background-color: #10B981; }
+  
+  /* 60% to 72%: Cache returns instant successful stream back down line */
+  72% { transform: translate(325px, 50px); opacity: 1; background-color: #10B981; }
+  
+  /* 72% to 100%: Pipeline returns gracefully back to the Client node */
+  85% { transform: translate(175px, 120px); opacity: 1; }
+  94% { transform: translate(35px, 120px); opacity: 1; }
+  100% { transform: translate(35px, 120px); opacity: 0; }
+}
+
+@keyframes lightCacheMissFlow {
+  /* Holds position off-canvas until Cache check triggers at 58% */
+  0%, 58% { transform: translate(325px, 50px); opacity: 0; background-color: #FF6B35; }
+  59% { opacity: 1; }
+  
+  /* 59% to 70%: Microservice 2 (Bottom Path Cache Miss) down to Database Index Array */
+  70% { transform: translate(325px, 190px); opacity: 1; background-color: #FF6B35; }
+  
+  /* 70% to 82%: Index Layer pulls matching key pointers from Primary Storage DB */
+  82% { transform: translate(415px, 190px); opacity: 1; background-color: #FF6B35; }
+  
+  /* 82% to 92%: Re-hydrated records map directly back to target instance engine */
+  92% { transform: translate(325px, 190px); opacity: 1; background-color: #FF6B35; }
+  98%, 100% { transform: translate(325px, 190px); opacity: 0; }
+}
+
+/* Node structural soft pulse effects on light panels */
+@keyframes lightNodeGlow {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.02)); border-color: #e2e8f0; }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 12px rgba(16,185,129,0.12)); border-color: #10B981; }
+}
+
+/* Hardware Utility Classes for Signup View */
+.animate-light-request {
+  animation: lightRequestFlow 6s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, background-color, opacity;
+}
+
+.animate-light-miss {
+  animation: lightCacheMissFlow 6s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, background-color, opacity;
+}
+
+.animate-light-node {
+  animation: lightNodeGlow 4s infinite ease-in-out;
+  transform-origin: center;
+  will-change: transform, filter, border-color;
+}
+
+/* ======================================================================
+   3. BRAND HEATMAP CELL CONFIGURATIONS (Using Low-Opacity to Solid Swatches)
+   ====================================================================== */
+.hm-0 { background: var(--color-background-secondary); }
+.hm-1 { background: rgba(16, 185, 129, 0.15); } /* Light green tint */
+.hm-2 { background: rgba(16, 185, 129, 0.45); } /* Medium green tint */
+.hm-3 { background: #10B981; }                  /* Solid Brand Green */
+.hm-4 { background: #059669; }                  /* Deep Emerald */
+
+
+/* ======================================================================
+   4. LANDING PAGE: UNIQUE 3D & INTERACTIVE ANIMATIONS
+   ====================================================================== */
+
+/* Floating 3D shapes */
+@keyframes float3d {
+  0%, 100% { transform: translateY(0px) rotateX(2deg) rotateY(-2deg); }
+  50% { transform: translateY(-18px) rotateX(4deg) rotateY(4deg); }
+}
+.float-3d {
+  transform-style: preserve-3d;
+  animation: float3d 8s infinite ease-in-out;
+}
+
+/* Glow pulsing for cards */
+@keyframes glowPulseOrange {
+  0% { box-shadow: 0 0 8px rgba(255,107,53,0.2); }
+  100% { box-shadow: 0 0 30px rgba(255,107,53,0.5), 0 0 60px rgba(255,107,53,0.2); }
+}
+.pulse-glow-orange {
+  animation: glowPulseOrange 3s infinite alternate;
+}
+
+@keyframes glowPulseGreen {
+  0% { box-shadow: 0 0 8px rgba(16,185,129,0.2); }
+  100% { box-shadow: 0 0 30px rgba(16,185,129,0.5), 0 0 60px rgba(16,185,129,0.2); }
+}
+.pulse-glow-green {
+  animation: glowPulseGreen 3s infinite alternate;
+}
+
+/* Background layer with radial gradients */
+.shapes-layer {
+  background: radial-gradient(circle at 20% 30%, rgba(255,107,53,0.03) 0%, transparent 70%),
+              radial-gradient(circle at 80% 70%, rgba(16,185,129,0.03) 0%, transparent 70%);
+}
+
+/* 3D tilt card hover effect */
+.tilt-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.tilt-card:hover {
+  transform: perspective(800px) rotateX(2deg) rotateY(4deg) scale(1.02);
+  box-shadow: 0 25px 40px -12px rgba(0,0,0,0.15);
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-20px) scale(1.05); }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Slow spin */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}
+
+/* Slow pulse */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.95); }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+/* Subtle bounce */
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s ease-in-out infinite;
+}
+
+/* 3D cube rotation */
+@keyframes rotate-3d {
+  0% { transform: rotateX(0deg) rotateY(0deg); }
+  100% { transform: rotateX(360deg) rotateY(360deg); }
+}
+.animate-rotate-3d {
+  animation: rotate-3d 15s linear infinite;
+  transform-style: preserve-3d;
+}
+
+/* 3D transform utilities */
+.translate-z-20 { transform: translateZ(20px); }
+.-translate-z-20 { transform: translateZ(-20px); }
+.-translate-x-20 { transform: translateX(-20px); }
+.translate-x-20 { transform: translateX(20px); }
+.-translate-y-20 { transform: translateY(-20px); }
+.translate-y-20 { transform: translateY(20px); }
+.rotate-y-90 { transform: rotateY(90deg); }
+.rotate-x-90 { transform: rotateX(90deg); }
+
+/* Pulse glow for center element */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.2); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Floating particles */
+@keyframes particle {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(30px, -30px) scale(0); opacity: 0; }
+}
+.animate-particle {
+  animation: particle 3s ease-in-out infinite;
+}
+
+/* Count up animation */
+@keyframes count-up {
+  0% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-count-up {
+  animation: count-up 1s ease-out forwards;
+}
+
+/* Ping dot */
+@keyframes ping {
+  0% { transform: scale(1); opacity: 1; }
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+.animate-ping {
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
