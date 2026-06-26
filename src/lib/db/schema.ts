@@ -54,3 +54,15 @@ export const dailyLogs = pgTable('daily_logs', {
   summary: text('summary'),
   mood: integer('mood'), 
 });
+
+// 7. NEW: User Personal Problem Tracking (Junction Table)
+export const userProblemsTracking = pgTable('user_problems_tracking', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  problemId: uuid('problem_id').references(() => problems.id, { onDelete: 'cascade' }).notNull(),
+  status: statusEnum('status').notNull().default('attempted'),
+  notes: text('notes'),
+  url: text('url'),
+  timeTaken: integer('time_taken'), // stored in minutes
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+});
