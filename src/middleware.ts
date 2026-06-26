@@ -6,14 +6,23 @@ export async function middleware(request: NextRequest) {
 
   // 1. Handle CORS for API routes
   if (pathname.startsWith('/api')) {
-    // Check if the incoming request origin matches your secondary local server
     const origin = request.headers.get('origin');
-    const allowedOrigin = 'http://localhost:3001';
+    
+    // Renamed to plural to match its array type
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://algotrack-seven.vercel.app', // Note: removed trailing slash to match standard origin format
+    ];
+
+    // Check if the current origin is allowed
+    const isAllowedOrigin = origin && allowedOrigins.includes(origin);
 
     // Handle Preflight OPTIONS requests
     if (request.method === 'OPTIONS') {
       const preflightHeaders = {
-        'Access-Control-Allow-Origin': origin === allowedOrigin ? allowedOrigin : '',
+        // Return the specific origin if allowed, otherwise an empty string or omit it
+        'Access-Control-Allow-Origin': isAllowedOrigin ? origin : '',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
         'Access-Control-Allow-Credentials': 'true',
@@ -23,8 +32,8 @@ export async function middleware(request: NextRequest) {
 
     // Prepare a base response for standard API requests
     let apiResponse = NextResponse.next({ request });
-    if (origin === allowedOrigin) {
-      apiResponse.headers.set('Access-Control-Allow-Origin', allowedOrigin);
+    if (isAllowedOrigin) {
+      apiResponse.headers.set('Access-Control-Allow-Origin', origin);
       apiResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
       apiResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       apiResponse.headers.set('Access-Control-Allow-Credentials', 'true');
