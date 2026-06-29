@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '../../../../lib/supabase/server';
 import { db } from '../../../../lib/db';
 import { solutionPanels, problems } from '../../../../lib/db/schema';
 import { desc, eq } from 'drizzle-orm';
 
 export async function GET() {
   try {
-    // Join solution panels with their corresponding problems to fetch titles dynamically
-    const results = await db
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (error || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const solutions = await db
       .select({
         id: solutionPanels.id,
         problemTitle: problems.title,
@@ -14,15 +21,16 @@ export async function GET() {
         codeContent: solutionPanels.codeContent,
         timeComplexity: solutionPanels.timeComplexity,
         spaceComplexity: solutionPanels.spaceComplexity,
-        createdAt: solutionPanels.createdAt
+        createdAt: solutionPanels.createdAt,
       })
       .from(solutionPanels)
-      .innerJoin(problems, eq(solutionPanels.problemId, problems.id))
+      .leftJoin(problems, eq(solutionPanels.problemId, problems.id))
+      .where(eq(solutionPanels.userId, user.id))
       .orderBy(desc(solutionPanels.createdAt));
 
-    return NextResponse.json(results);
+    return NextResponse.json(solutions);
   } catch (error) {
-    console.error("Failed fetching solutions vault portfolio records:", error);
-    return NextResponse.json({ error: 'Database pipeline query error' }, { status: 500 });
+    console.error('Error fetching solutions:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

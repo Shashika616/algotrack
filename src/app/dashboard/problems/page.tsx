@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useDashboard } from '../../../context/DashboardContext';
 
 type Track = 'dsa' | 'system_design';
 type Mode = 'menu' | 'topic_selected' | 'learn' | 'exercises' | 'workspace' | 'my_solutions';
@@ -16,7 +17,11 @@ interface Problem {
   title: string;
   difficulty: 'Easy' | 'Med' | 'Hard';
   description: string;
-  examples: { input: string; output: string }[];
+  examples: { 
+    input: string; 
+    output: string;
+    explanation?: string;
+  }[];
 }
 
 interface Panel {
@@ -81,7 +86,7 @@ export default function ProblemsSection() {
   const [loadingSolutions, setLoadingSolutions] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  // Modals & Popups States - REFACTORED WITH SEPARATE ANALYZE AND SAVE
+  // Modals & Popups States
   const [tabToCloseId, setTabToCloseId] = useState<string | null>(null);
   const [showAnalyzeModal, setShowAnalyzeModal] = useState<boolean>(false);
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
@@ -90,6 +95,7 @@ export default function ProblemsSection() {
   // Workspace Panels Tracking Layouts
   const [panels, setPanels] = useState<Panel[]>([]);
   const [activePanelId, setActivePanelId] = useState<string>('');
+  const [panelCounter, setPanelCounter] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inlineInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -106,6 +112,10 @@ export default function ProblemsSection() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [currentBrushPath, setCurrentBrushPath] = useState<{ x: number; y: number }[]>([]);
   const [activeTextBox, setActiveTextBox] = useState<{ id?: string; x: number; y: number; w: number; h: number; text: string } | null>(null);
+  const [showProblemPopup, setShowProblemPopup] = useState<boolean>(false);
+  const [saveStatus, setSaveStatus] = useState<{ [key: string]: 'idle' | 'saving' | 'saved' | 'error' }>({});
+  const [selectedSaveStatus, setSelectedSaveStatus] = useState<'solved' | 'attempted' | 'reviewed'>('attempted');
+  const { navigationData, clearNavigation } = useDashboard();
 
   // FETCH HOOK 1: Sync active list of topics on category modification
   useEffect(() => {
@@ -146,37 +156,44 @@ export default function ProblemsSection() {
   }, [selectedTopicEntity, mode]);
 
   // FETCH HOOK 3: Hydrate existing workspace solution panels when a problem is launched
-  useEffect(() => {
-    if (!selectedProblem || mode !== 'workspace') return;
+useEffect(() => {
+  if (!selectedProblem || mode !== 'workspace') return;
 
-    const loadSavedWorkspaces = async () => {
-      try {
-        const response = await fetch(`/api/solution-panels?problemId=${selectedProblem.id}`);
-        const data = await response.json();
-        
-        if (Array.isArray(data) && data.length > 0) {
-          const loadedPanels: Panel[] = data.map((p) => ({
-            id: `panel-${p.language}`,
-            dbId: p.id,
-            language: p.language,
-            code: p.codeContent || '',
-            timeComp: p.timeComplexity || undefined,
-            spaceComp: p.spaceComplexity || undefined,
-            isAnalyzing: false
-          }));
-          setPanels(loadedPanels);
-          setActivePanelId(loadedPanels[0].id);
-        } else {
-          const defaultId = `panel-python`;
-          setPanels([{ id: defaultId, language: 'python', code: '# Type your production system code script here\n', isAnalyzing: false }]);
-          setActivePanelId(defaultId);
-        }
-      } catch (err) {
-        console.error('Failed syncing active dashboard buffers:', err);
+  const loadSavedWorkspaces = async () => {
+    try {
+      const response = await fetch(`/api/solution-panels?problemId=${selectedProblem.id}`);
+      const data = await response.json();
+      
+      if (Array.isArray(data) && data.length > 0) {
+        const loadedPanels: Panel[] = data.map((p, index) => ({
+          id: p.id || `panel-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 6)}`,
+          dbId: p.id,
+          language: p.language,
+          code: p.codeContent || '',
+          timeComp: p.timeComplexity || undefined,
+          spaceComp: p.spaceComplexity || undefined,
+          isAnalyzing: false
+        }));
+        setPanels(loadedPanels);
+        setActivePanelId(loadedPanels[0].id);
+        setPanelCounter(loadedPanels.length);
+      } else {
+        const defaultId = `panel-${Date.now()}-0-${Math.random().toString(36).substring(2, 6)}`;
+        setPanels([{ 
+          id: defaultId, 
+          language: 'python', 
+          code: '# Type your production system code script here\n', 
+          isAnalyzing: false 
+        }]);
+        setActivePanelId(defaultId);
+        setPanelCounter(1);
       }
-    };
-    loadSavedWorkspaces();
-  }, [selectedProblem, mode]);
+    } catch (err) {
+      console.error('Failed syncing active dashboard buffers:', err);
+    }
+  };
+  loadSavedWorkspaces();
+}, [selectedProblem, mode]);
 
   // FETCH HOOK 4: Load "My Solutions" history dashboard grid
   useEffect(() => {
@@ -196,6 +213,76 @@ export default function ProblemsSection() {
     };
     fetchAllSolutionsHistory();
   }, [mode]);
+
+  // HOOK 5: Dashboard navigations
+  // Handle navigation from dashboard - SINGLE API CALL
+  useEffect(() => {
+    if (!navigationData) return;
+
+    const fetchNavigationData = async () => {
+      try {
+        // Build query params
+        const params = new URLSearchParams();
+        if (navigationData.problemId) {
+          params.append('problemId', navigationData.problemId);
+        }
+        if (navigationData.topicId) {
+          params.append('topicId', navigationData.topicId);
+        }
+
+        const response = await fetch(`/api/dashboard/navigate?${params.toString()}`);
+        const data = await response.json();
+
+        // CASE 1: Navigate to a specific problem
+        if (navigationData.problemId && data.problem) {
+          setSelectedProblem(data.problem);
+          setSelectedTopic(navigationData.problemName!);
+          setMode('workspace');
+          setIsDrawerOpen(true);
+          
+          // If solutions exist, load them into panels
+          if (data.solutions && data.solutions.length > 0) {
+            const loadedPanels = data.solutions.map((p: any, index: number) => ({
+              id: p.id || `panel-${Date.now()}-${index}`,
+              dbId: p.id,
+              language: p.language,
+              code: p.codeContent || '',
+              timeComp: p.timeComplexity || undefined,
+              spaceComp: p.spaceComplexity || undefined,
+              isAnalyzing: false
+            }));
+            setPanels(loadedPanels);
+            setActivePanelId(loadedPanels[0]?.id || '');
+            setPanelCounter(loadedPanels.length);
+          }
+          
+          clearNavigation();
+          return;
+        }
+
+        // CASE 2: Navigate to a specific topic
+        if (navigationData.topicId && data.topic) {
+          setSelectedTopicEntity(data.topic);
+          setSelectedTopic(navigationData.topicName!);
+          setMode('exercises');
+          
+          // If problems for this topic were returned, set them
+          if (data.problems) {
+            setProblemsList(data.problems);
+          }
+          
+          clearNavigation();
+          return;
+        }
+      } catch (err) {
+        console.error('Error fetching navigation data:', err);
+      }
+    };
+
+    fetchNavigationData();
+  }, [navigationData]); // Re-run when navigationData changes
+
+  
 
   // ============================================================================
   // REFACTORED: SEPARATE ANALYZE AND SAVE FUNCTIONALITY
@@ -229,29 +316,45 @@ export default function ProblemsSection() {
     }, 1200);
   };
 
-  // SAVE CODE TO DATABASE SEPARATELY - only saves, no analysis
-  const executeDatabaseSave = async (currentPanel: Panel, probId: string) => {
-    setIsSaving(true);
+  const executeDatabaseSave = async (currentPanel: Panel, probId: string, status: string = 'attempted') => {
+    // Set saving state for this panel
+    setSaveStatus(prev => ({ ...prev, [currentPanel.id]: 'saving' }));
+    
     try {
       const response = await fetch('/api/solution-panels/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           problemId: probId,
+          panelId: currentPanel.id,
           language: currentPanel.language,
           codeContent: currentPanel.code,
           timeComplexity: currentPanel.timeComp || null,
-          spaceComplexity: currentPanel.spaceComp || null
+          spaceComplexity: currentPanel.spaceComp || null,
+          status: status
         })
       });
+      
       const data = await response.json();
-      if (data.id) {
-        setPanels(prev => prev.map(p => p.id === currentPanel.id ? { ...p, dbId: data.id } : p));
+      
+      if (data.success) {
+        // Update panel with dbId
+        setPanels(prev => prev.map(p => 
+          p.id === currentPanel.id ? { ...p, dbId: data.data.id } : p
+        ));
+        
+        setSaveStatus(prev => ({ ...prev, [currentPanel.id]: 'saved' }));
+        
+        // Auto-revert status after 2 seconds
+        setTimeout(() => {
+          setSaveStatus(prev => ({ ...prev, [currentPanel.id]: 'idle' }));
+        }, 2000);
+      } else {
+        setSaveStatus(prev => ({ ...prev, [currentPanel.id]: 'error' }));
       }
     } catch (err) {
       console.error('Database write execution failure:', err);
-    } finally {
-      setIsSaving(false);
+      setSaveStatus(prev => ({ ...prev, [currentPanel.id]: 'error' }));
     }
   };
 
@@ -286,7 +389,8 @@ export default function ProblemsSection() {
 
     const targetPanel = panels.find(p => p.id === pendingActionPanelId);
     if (targetPanel) {
-      executeDatabaseSave(targetPanel, selectedProblem.id);
+      const status = selectedSaveStatus || 'attempted';
+      executeDatabaseSave(targetPanel, selectedProblem.id, status);
     }
     setPendingActionPanelId(null);
   };
@@ -298,7 +402,8 @@ export default function ProblemsSection() {
   const triggerDebouncedAutoSave = useCallback((updatedPanel: Panel, probId: string) => {
     if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
     debounceTimeoutRef.current = setTimeout(() => {
-      executeDatabaseSave(updatedPanel, probId);
+      // Auto-save with 'attempted' status
+      executeDatabaseSave(updatedPanel, probId, 'attempted');
     }, 1500);
   }, []);
 
@@ -636,57 +741,82 @@ export default function ProblemsSection() {
     }
   };
 
-  const createNewPanel = () => {
-    if (!selectedProblem) return;
-    const openLanguages = panels.map(p => p.language);
-    const available: Panel['language'][] = ['python', 'java', 'c#', 'javascript', 'algorithm'];
-    const nextLang = available.find(l => !openLanguages.includes(l)) || 'algorithm';
+// Create new panel
+const createNewPanel = () => {
+  if (!selectedProblem) return;
+  
+  // Check if we already have all languages
+  const openLanguages = panels.map(p => p.language);
+  const available: Panel['language'][] = ['python', 'java', 'c#', 'javascript', 'algorithm'];
+  const nextLang = available.find(l => !openLanguages.includes(l));
+  
+  if (!nextLang) {
+    // All languages are already open
+    return;
+  }
 
-    const newId = `panel-${nextLang}`;
-    const newPanel: Panel = { id: newId, language: nextLang, code: '// Formulate alternative paradigms\n', isAnalyzing: false };
-    setPanels([...panels, newPanel]);
-    setActivePanelId(newId);
-    executeDatabaseSave(newPanel, selectedProblem.id);
+  const newId = `panel-${Date.now()}-${panelCounter}-${Math.random().toString(36).substring(2, 6)}`;
+  setPanelCounter(prev => prev + 1);
+  
+  const newPanel: Panel = { 
+    id: newId, 
+    language: nextLang, 
+    code: `// ${LANGUAGE_LABELS[nextLang]} solution\n`, 
+    isAnalyzing: false 
   };
+  setPanels([...panels, newPanel]);
+  setActivePanelId(newId);
+  executeDatabaseSave(newPanel, selectedProblem.id);
+};
 
-  const updatePanelLanguage = (id: string, lang: Panel['language']) => {
-    if (!selectedProblem) return;
-    setPanels(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, language: lang, id: `panel-${lang}` } : p);
-      const target = updated.find(p => p.id === `panel-${lang}`);
-      setActivePanelId(`panel-${lang}`);
-      if (target) executeDatabaseSave(target, selectedProblem.id);
-      return updated;
-    });
-  };
-
-  const updatePanelCode = (id: string, text: string) => {
-    if (!selectedProblem) return;
-    setPanels(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, code: text } : p);
-      const target = updated.find(p => p.id === id);
-      if (target) triggerDebouncedAutoSave(target, selectedProblem.id);
-      return updated;
-    });
-  };
-
-  const requestCloseTab = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); 
-    setTabToCloseId(id);
-  };
-
-  const confirmCloseTabAction = () => {
-    if (!tabToCloseId) return;
-    const targetIndex = panels.findIndex(p => p.id === tabToCloseId);
-    const updatedPanels = panels.filter(p => p.id !== tabToCloseId);
-    setPanels(updatedPanels);
-    setTabToCloseId(null);
-
-    if (activePanelId === tabToCloseId && updatedPanels.length > 0) {
-      const nextActiveIndex = Math.max(0, targetIndex - 1);
-      setActivePanelId(updatedPanels[nextActiveIndex].id);
+// Update panel language
+const updatePanelLanguage = (id: string, lang: Panel['language']) => {
+  if (!selectedProblem) return;
+  setPanels(prev => {
+    const updated = prev.map(p => 
+      p.id === id ? { ...p, language: lang } : p
+    );
+    const target = updated.find(p => p.id === id);
+    if (target) {
+      // Save with the new language
+      executeDatabaseSave(target, selectedProblem.id);
     }
-  };
+    return updated;
+  });
+};
+
+// Update panel code with debounced save
+const updatePanelCode = (id: string, text: string) => {
+  if (!selectedProblem) return;
+  setPanels(prev => {
+    const updated = prev.map(p => p.id === id ? { ...p, code: text } : p);
+    const target = updated.find(p => p.id === id);
+    if (target) {
+      triggerDebouncedAutoSave(target, selectedProblem.id);
+    }
+    return updated;
+  });
+};
+
+// Request close tab
+const requestCloseTab = (e: React.MouseEvent, id: string) => {
+  e.stopPropagation();
+  setTabToCloseId(id);
+};
+
+// Confirm close tab
+const confirmCloseTabAction = () => {
+  if (!tabToCloseId) return;
+  const targetIndex = panels.findIndex(p => p.id === tabToCloseId);
+  const updatedPanels = panels.filter(p => p.id !== tabToCloseId);
+  setPanels(updatedPanels);
+  setTabToCloseId(null);
+
+  if (activePanelId === tabToCloseId && updatedPanels.length > 0) {
+    const nextActiveIndex = Math.max(0, targetIndex - 1);
+    setActivePanelId(updatedPanels[nextActiveIndex].id);
+  }
+};
 
   return (
     <div className="space-y-4 h-full flex flex-col relative overflow-x-hidden">
@@ -734,6 +864,44 @@ export default function ProblemsSection() {
               <h4 className="text-sm font-bold text-slate-800">Save Code to Database?</h4>
               <p className="text-xs text-slate-400 mt-1">Your code and complexity metrics will be committed to Supabase and synced to your solutions vault.</p>
             </div>
+            
+            {/* Status Selection */}
+            <div className="text-left">
+              <label className="text-xs font-medium text-slate-600 block mb-1.5">Status:</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedSaveStatus('attempted')}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    selectedSaveStatus === 'attempted' 
+                      ? 'bg-slate-900 text-white border-slate-900' 
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Attempted
+                </button>
+                <button
+                  onClick={() => setSelectedSaveStatus('reviewed')}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    selectedSaveStatus === 'reviewed' 
+                      ? 'bg-blue-600 text-white border-blue-600' 
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Reviewed
+                </button>
+                <button
+                  onClick={() => setSelectedSaveStatus('solved')}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    selectedSaveStatus === 'solved' 
+                      ? 'bg-emerald-600 text-white border-emerald-600' 
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Solved
+                </button>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-2 gap-2 text-xs">
               <button onClick={() => setShowSaveModal(false)} className="py-2 font-semibold rounded-lg border border-slate-200 bg-white text-slate-500 cursor-pointer hover:bg-slate-50">Cancel</button>
               <button onClick={confirmSaveAction} className="py-2 font-semibold rounded-lg bg-[#10B981] text-white cursor-pointer shadow-sm hover:bg-[#059669]">Save</button>
@@ -768,7 +936,7 @@ export default function ProblemsSection() {
           )}
         </div>
         {mode === 'workspace' && (
-          <button onClick={() => setIsDrawerOpen(!isDrawerOpen)} className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold border rounded-lg bg-slate-50 text-slate-600 hover:text-slate-900 border-slate-200 cursor-pointer">📋 {isDrawerOpen ? 'Hide Statement' : 'View Statement'}</button>
+          <button onClick={() => setIsDrawerOpen(!isDrawerOpen)} className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold border rounded-lg bg-slate-50 text-slate-600 hover:text-slate-900 border-slate-200 cursor-pointer">📋 {isDrawerOpen ? 'Hide Problem' : 'View Problem'}</button>
         )}
       </div>
 
@@ -914,17 +1082,163 @@ export default function ProblemsSection() {
             )}
           </div>
 
-          {/* PROBLEM DRAWER SLIDER */}
+          {/* PROBLEM DRAWER SLIDER - With Examples and Explanations */}
           <div className={`bg-white border border-slate-200 rounded-xl p-5 shadow-lg flex flex-col justify-between overflow-y-auto text-left absolute z-30 top-0 bottom-0 left-0 w-[290px] transition-all duration-300 transform h-full ${isDrawerOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'}`}>
             <div className="space-y-4">
+              {/* Close Button */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <button onClick={() => setIsDrawerOpen(false)} className="text-slate-400 hover:text-slate-700 text-xs font-mono">✕ Close</button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setShowProblemPopup(true)} 
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors"
+                    title="Open in popup for better readability"
+                  >
+                    📖 Expand
+                  </button>
+                  <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+                    {selectedProblem.difficulty}
+                  </span>
+                </div>
               </div>
-              <h2 className="text-xs font-bold text-slate-900">{selectedProblem.title}</h2>
-              <p className="text-xs text-slate-500 leading-relaxed bg-slate-50/60 p-3 rounded-lg border border-slate-100">{selectedProblem.description}</p>
+              
+              {/* Problem Title */}
+              <h2 className="text-xs font-bold text-slate-900 leading-relaxed">{selectedProblem.title}</h2>
+              
+              {/* Problem Description */}
+              <div className="bg-slate-50/60 p-3 rounded-lg border border-slate-100">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {selectedProblem.description}
+                </p>
+              </div>
+              
+              {/* Examples Section with Explanation */}
+              {selectedProblem.examples && selectedProblem.examples.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <span>📝 Examples</span>
+                    <span className="h-px flex-1 bg-slate-200"></span>
+                  </h3>
+                  {selectedProblem.examples.map((ex, idx) => (
+                    <div key={idx} className="bg-slate-50 rounded-lg border border-slate-100 overflow-hidden">
+                      <div className="bg-slate-100/50 px-3 py-1.5 border-b border-slate-100">
+                        <span className="text-[9px] font-mono font-bold text-slate-500">Example {idx + 1}</span>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {/* Input */}
+                        <div className="text-[10px] font-mono flex items-start gap-2">
+                          <span className="text-slate-400 min-w-[36px] font-bold">Input:</span>
+                          <code className="text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200 flex-1">
+                            {ex.input}
+                          </code>
+                        </div>
+                        
+                        {/* Output */}
+                        <div className="text-[10px] font-mono flex items-start gap-2">
+                          <span className="text-slate-400 min-w-[36px] font-bold">Output:</span>
+                          <code className="text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200 flex-1">
+                            {ex.output}
+                          </code>
+                        </div>
+                        
+                        {/* Explanation */}
+                        {ex.explanation && (
+                          <div className="mt-1 pt-2 border-t border-slate-200/60">
+                            <div className="flex items-start gap-2">
+                              <span className="text-[10px] font-mono font-bold text-emerald-600 min-w-[36px]">💡 Exp:</span>
+                              <div className="text-[10px] text-slate-600 leading-relaxed flex-1">
+                                {ex.explanation}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <button onClick={() => setMode('exercises')} className="w-full mt-4 py-1.5 text-center text-xs font-semibold text-slate-400 hover:text-slate-700 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer">← Exit Workspace</button>
+            
+            {/* Exit Button */}
+            <button onClick={() => setMode('exercises')} className="w-full mt-4 py-1.5 text-center text-xs font-semibold text-slate-400 hover:text-slate-700 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer transition-colors">
+              ← Exit Workspace
+            </button>
           </div>
+
+          {/* PROBLEM POPUP MODAL - For easier reading */}
+          {showProblemPopup && selectedProblem && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+                {/* Header with Show in Sidebar button */}
+                <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50/50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+                      {selectedProblem.difficulty}
+                    </span>
+                    <h2 className="text-sm font-bold text-slate-900">{selectedProblem.title}</h2>
+                  </div>
+                  <button 
+                    onClick={() => { setShowProblemPopup(false); setIsDrawerOpen(true); }} 
+                    className="px-3 py-1.5 text-xs font-semibold text-white bg-[#FF6B35] hover:bg-[#E04E1B] rounded-lg transition-colors shadow-sm whitespace-nowrap"
+                  >
+                    📋 Show in Sidebar
+                  </button>
+                </div>
+                
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {/* Description */}
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Description</h3>
+                    <div className="bg-slate-50/60 p-4 rounded-lg border border-slate-100">
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        {selectedProblem.description}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Examples */}
+                  {selectedProblem.examples && selectedProblem.examples.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Examples</h3>
+                      <div className="space-y-4">
+                        {selectedProblem.examples.map((ex, idx) => (
+                          <div key={idx} className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
+                            <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
+                              <span className="text-xs font-mono font-bold text-slate-600">Example {idx + 1}</span>
+                            </div>
+                            <div className="p-4 space-y-3">
+                              <div>
+                                <span className="text-xs font-mono font-bold text-slate-500 block mb-1">Input:</span>
+                                <code className="text-sm font-mono text-slate-700 bg-white px-3 py-2 rounded border border-slate-200 block whitespace-pre-wrap">
+                                  {ex.input}
+                                </code>
+                              </div>
+                              <div>
+                                <span className="text-xs font-mono font-bold text-slate-500 block mb-1">Output:</span>
+                                <code className="text-sm font-mono text-slate-700 bg-white px-3 py-2 rounded border border-slate-200 block whitespace-pre-wrap">
+                                  {ex.output}
+                                </code>
+                              </div>
+                              {ex.explanation && (
+                                <div className="mt-2 pt-2 border-t border-slate-200/60">
+                                  <span className="text-xs font-mono font-bold text-emerald-600 block mb-1">💡 Explanation:</span>
+                                  <p className="text-sm text-slate-600 leading-relaxed">
+                                    {ex.explanation}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+              </div>
+            </div>
+          )}
 
           {/* SPLIT COLS CONTROLLER */}
           <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 w-full h-full min-h-0 transition-all duration-300 ${isDrawerOpen ? 'lg:pl-[306px]' : 'pl-0'}`}>
@@ -1049,16 +1363,18 @@ export default function ProblemsSection() {
                             onClick={() => requestComplexityAnalysis(p.id)} 
                             disabled={p.isAnalyzing} 
                             className="py-2 rounded-lg bg-[#FF6B35] hover:bg-[#E04E1B] disabled:bg-slate-200 text-white font-semibold text-xs transition-all shadow-md cursor-pointer"
-                            >
+                          >
                             {p.isAnalyzing ? 'Analyzing...' : '🔍 Analyze'}
                           </button>
                           
                           <button 
                             onClick={() => requestManualSave(p.id)} 
-                            disabled={isSaving} 
+                            disabled={saveStatus[p.id] === 'saving'} 
                             className="py-2 rounded-lg bg-[#10B981] hover:bg-[#059669] disabled:bg-slate-200 text-white font-semibold text-xs transition-all shadow-md cursor-pointer"
-                            >
-                            {isSaving ? 'Saving...' : '💾 Save'}
+                          >
+                            {saveStatus[p.id] === 'saving' ? 'Saving...' : 
+                            saveStatus[p.id] === 'saved' ? '✓ Saved!' : 
+                            saveStatus[p.id] === 'error' ? '⚠️ Error' : '💾 Save'}
                           </button>
                         </div>
                       </div>

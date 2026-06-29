@@ -1,19 +1,10 @@
 import { pgTable, uuid, text, timestamp, integer, pgEnum, jsonb } from 'drizzle-orm/pg-core';
 
-// 1. Enums matching your Supabase definitions exactly
+// 1. Enums matching your Supabase definitions
 export const trackCategoryEnum = pgEnum('track_category', ['dsa', 'system_design']);
-export const difficultyEnum = pgEnum('difficulty', ['Easy', 'Med', 'Hard']); // Capitalized to match CHECK constraints
-export const statusEnum = pgEnum('status', ['solved', 'attempted', 'reviewed']);
+export const difficultyEnum = pgEnum('difficulty', ['Easy', 'Med', 'Hard']);
 
-// 2. Profiles table linked to Supabase Auth
-export const profiles = pgTable('profiles', {
-  id: uuid('id').primaryKey().notNull(), 
-  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }),
-  fullName: text('full_name'),
-  avatarUrl: text('avatar_url'),
-});
-
-// 3. Structured Topics Table (e.g., Arrays, Load Balancers)
+// 2. Topics table (Global)
 export const topics = pgTable('topics', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull().unique(),
@@ -21,48 +12,51 @@ export const topics = pgTable('topics', {
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 });
 
-// 4. Main Problems Table linked to your relational topics
+// 3. Problems table (Global)
 export const problems = pgTable('problems', {
   id: uuid('id').defaultRandom().primaryKey(),
   topicId: uuid('topic_id').references(() => topics.id, { onDelete: 'cascade' }).notNull(),
   title: text('title').notNull(),
-  description: text('description').notNull(), // Supports LeetCode/system design markdown elements
+  description: text('description').notNull(),
   difficulty: difficultyEnum('difficulty').notNull().default('Easy'),
-  imageUrls: text('image_urls').array().default([]), // Storage bucket asset reference strings
-  examples: jsonb('examples').default([]), // Store input/output sample test arrays
+  imageUrls: text('image_urls').array().default([]),
+  examples: jsonb('examples').default([]),
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 });
 
-// 5. Solution Panels Table to save persistent code tabs and whiteboard graphics state
-export const solutionPanels = pgTable('solution_panels', {
+// 4. User Problems Tracking (User-specific)
+export const userProblemsTracking = pgTable('user_problems_tracking', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull(), // References auth.users
   problemId: uuid('problem_id').references(() => problems.id, { onDelete: 'cascade' }).notNull(),
-  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }), // Keeps user saves isolated
-  language: text('language').notNull(), // 'python' | 'java' | 'c#' | 'javascript' | 'algorithm'
-  codeContent: text('code_content').default(''),
-  whiteboardData: jsonb('whiteboard_data').default({}), // Serialized vector canvas lines/shapes masking layers
-  timeComplexity: text('time_complexity'),
-  spaceComplexity: text('space_complexity'),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-});
+  status: text('status').notNull().default('attempted'), // 'solved', 'attempted', 'reviewed'
+  notes: text('notes'),
+  url: text('url'),
+  timeTaken: integer('time_taken'),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+  // Ensure a user can only have one entry per problem
+  unq_user_problem: { columns: [table.userId, table.problemId] },
+}));
 
-// 6. Daily Tracker Logs
+// 5. Daily Logs (User-specific)
 export const dailyLogs = pgTable('daily_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').notNull(), // References auth.users
   date: timestamp('date', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
   summary: text('summary'),
   mood: integer('mood'), 
 });
 
-// 7. NEW: User Personal Problem Tracking (Junction Table)
-export const userProblemsTracking = pgTable('user_problems_tracking', {
+// 6. Solution Panels (User-specific) - if you need this
+export const solutionPanels = pgTable('solution_panels', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
   problemId: uuid('problem_id').references(() => problems.id, { onDelete: 'cascade' }).notNull(),
-  status: statusEnum('status').notNull().default('attempted'),
-  notes: text('notes'),
-  url: text('url'),
-  timeTaken: integer('time_taken'), // stored in minutes
-  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+  userId: uuid('user_id').notNull(),
+  language: text('language').notNull(),
+  codeContent: text('code_content').default(''),
+  whiteboardData: jsonb('whiteboard_data').default({}),
+  timeComplexity: text('time_complexity'),
+  spaceComplexity: text('space_complexity'),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 });

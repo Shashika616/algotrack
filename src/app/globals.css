@@ -305,3 +305,10 @@ body {
 .animate-ping {
   animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+/* Heatmap activity levels */
+.hm-0 { background-color: #e2e8f0; }
+.hm-1 { background-color: #bbf7d0; }
+.hm-2 { background-color: #86efac; }
+.hm-3 { background-color: #4ade80; }
+.hm-4 { background-color: #22c55e; }
