@@ -1078,7 +1078,7 @@ const confirmCloseTabAction = () => {
             {isSaving ? (
               <span className="text-orange-600 bg-orange-50 border-orange-100 animate-pulse">● Syncing Changes...</span>
             ) : (
-              <span className="text-emerald-600 bg-emerald-50 border-emerald-100">✓ Supabase Synced</span>
+              <span className="text-emerald-600 bg-emerald-50 border-emerald-100">✓</span>
             )}
           </div>
 
