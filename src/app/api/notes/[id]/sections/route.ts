@@ -5,11 +5,18 @@ import { db } from '../../../../../lib/db';
 import { notes, noteSections } from '../../../../../lib/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
+interface RouteParams {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: { user }, error } = await supabase.auth.getUser();
     
@@ -21,7 +28,7 @@ export async function GET(
     const [note] = await db
       .select()
       .from(notes)
-      .where(and(eq(notes.id, params.id), eq(notes.userId, user.id)));
+      .where(and(eq(notes.id, id), eq(notes.userId, user.id)));
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 });
@@ -30,7 +37,7 @@ export async function GET(
     const sections = await db
       .select()
       .from(noteSections)
-      .where(eq(noteSections.noteId, params.id))
+      .where(eq(noteSections.noteId, id))
       .orderBy(noteSections.order);
 
     return NextResponse.json(sections);
@@ -42,9 +49,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: { user }, error } = await supabase.auth.getUser();
     
@@ -58,7 +66,7 @@ export async function POST(
     const [note] = await db
       .select()
       .from(notes)
-      .where(and(eq(notes.id, params.id), eq(notes.userId, user.id)));
+      .where(and(eq(notes.id, id), eq(notes.userId, user.id)));
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 });
@@ -70,7 +78,7 @@ export async function POST(
       const maxOrderResult = await db
         .select({ maxOrder: sql<number>`max(${noteSections.order})` })
         .from(noteSections)
-        .where(eq(noteSections.noteId, params.id));
+        .where(eq(noteSections.noteId, id));
       
       finalOrder = (maxOrderResult[0]?.maxOrder ?? -1) + 1;
     }
@@ -78,7 +86,7 @@ export async function POST(
     const [section] = await db
       .insert(noteSections)
       .values({
-        noteId: params.id,
+        noteId: id,
         title: title || 'New Section',
         content: content || '',
         order: finalOrder,

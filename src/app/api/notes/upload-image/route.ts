@@ -1,6 +1,6 @@
 // app/api/notes/upload-image/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '../../../../lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {

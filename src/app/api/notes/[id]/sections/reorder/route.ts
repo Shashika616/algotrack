@@ -4,11 +4,18 @@ import { db } from '../../../../../../lib/db';
 import { notes, noteSections } from '../../../../../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+interface RouteParams {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const { sectionOrders } = await request.json();
@@ -31,25 +38,25 @@ export async function POST(
     const [note] = await db
       .select()
       .from(notes)
-      .where(and(eq(notes.id, params.id), eq(notes.userId, userId)));
+      .where(and(eq(notes.id, id), eq(notes.userId, userId)));
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 });
     }
 
     // Update each section's order
-    const updates = sectionOrders.map(async ({ id, order }: { id: string; order: number }) => {
+    const updates = sectionOrders.map(async ({ id: sectionId, order }: { id: string; order: number }) => {
       // Verify section belongs to this note
       const [section] = await db
         .select()
         .from(noteSections)
         .where(and(
-          eq(noteSections.id, id),
-          eq(noteSections.noteId, params.id)
+          eq(noteSections.id, sectionId),
+          eq(noteSections.noteId, id)
         ));
 
       if (!section) {
-        throw new Error(`Section ${id} not found in this note`);
+        throw new Error(`Section ${sectionId} not found in this note`);
       }
 
       return db
@@ -58,7 +65,7 @@ export async function POST(
           order,
           updatedAt: new Date(),
         })
-        .where(eq(noteSections.id, id))
+        .where(eq(noteSections.id, sectionId))
         .returning();
     });
 

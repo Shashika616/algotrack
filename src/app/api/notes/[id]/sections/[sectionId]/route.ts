@@ -4,11 +4,19 @@ import { db } from '../../../../../../lib/db';
 import { notes, noteSections } from '../../../../../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+interface RouteParams {
+  params: Promise<{
+    id: string;
+    sectionId: string;
+  }>;
+}
+
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; sectionId: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id, sectionId } = await params;
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const { title, content, order } = await request.json();
@@ -24,7 +32,7 @@ export async function PUT(
     const [note] = await db
       .select()
       .from(notes)
-      .where(and(eq(notes.id, params.id), eq(notes.userId, userId)));
+      .where(and(eq(notes.id, id), eq(notes.userId, userId)));
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 });
@@ -35,8 +43,8 @@ export async function PUT(
       .select()
       .from(noteSections)
       .where(and(
-        eq(noteSections.id, params.sectionId),
-        eq(noteSections.noteId, params.id)
+        eq(noteSections.id, sectionId),
+        eq(noteSections.noteId, id)
       ));
 
     if (!section) {
@@ -51,7 +59,7 @@ export async function PUT(
         order: order !== undefined ? order : section.order,
         updatedAt: new Date(),
       })
-      .where(eq(noteSections.id, params.sectionId))
+      .where(eq(noteSections.id, sectionId))
       .returning();
 
     return NextResponse.json(updatedSection);
@@ -63,9 +71,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; sectionId: string } }
+  { params }: RouteParams
 ) {
   try {
+    const { id, sectionId } = await params;
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
@@ -80,7 +89,7 @@ export async function DELETE(
     const [note] = await db
       .select()
       .from(notes)
-      .where(and(eq(notes.id, params.id), eq(notes.userId, userId)));
+      .where(and(eq(notes.id, id), eq(notes.userId, userId)));
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 });
@@ -91,8 +100,8 @@ export async function DELETE(
       .select()
       .from(noteSections)
       .where(and(
-        eq(noteSections.id, params.sectionId),
-        eq(noteSections.noteId, params.id)
+        eq(noteSections.id, sectionId),
+        eq(noteSections.noteId, id)
       ));
 
     if (!section) {
@@ -101,7 +110,7 @@ export async function DELETE(
 
     await db
       .delete(noteSections)
-      .where(eq(noteSections.id, params.sectionId));
+      .where(eq(noteSections.id, sectionId));
 
     return NextResponse.json({ success: true });
   } catch (error) {

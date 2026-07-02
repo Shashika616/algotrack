@@ -1,12 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+// Cleaned up imports using your working path alias!
 import { createClient } from '../../../../../../lib/supabase/server';
 import { db } from '../../../../../../lib/db';
 import { musicTracks } from '../../../../../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+// 1. Used NextRequest for standard typing consistency
+// 2. Swapped the inline params type for your RouteParams interface
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: RouteParams
 ) {
   try {
     const supabase = await createClient();
@@ -16,6 +23,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // 3. This await is now safe and properly typed!
     const { id } = await params;
     const body = await request.json();
     const { duration } = body;
